@@ -18,8 +18,8 @@ K = 5
 # declaration des variables
 LE = []	#liste erreur à chaque pas de temps
 LEm= [] #liste erreur moyenne à chaque pas de temps
-data_MP = []	#de la forme [param1,param2,param3,err]
-
+data_MP = []	#de la forme [param1,param2,param3,ecart]
+data_P = []		#de la forme [param1,param2,param3,distance]
 
 
 vrep.simxFinish(-1) # fermeture de toutes les connexions ouvertes
@@ -102,6 +102,10 @@ def bouclePrincipale():
 		'''
 		#TODO calcul de la distance, ce serait bien de faire avec senseurs, sinon directement avec les fonctions de VREP
 		Sa=0
+		#sauvegarde dans data_P
+		ajoutData=list(possibleActions[indiceActionChoisie])
+		ajoutData.append(Sa)
+		data_P.append(ajoutData)
 		#calcul de l'erreur
 		E= abs(S-Sa)
 		#sauvegarde dans data_MP
@@ -115,7 +119,7 @@ def bouclePrincipale():
 	return 0
 
 def MetaPredictionMP(action):
-	d=[]	#on va ranger dans cette liste l'écart entre notre action et chaque example de la bdd
+	d=[]	#on va ranger dans cette liste l'écart entre notre action et chaque exemple de la bdd
 	res=0	#valeur moyenne des K plus proches voisins, à retourner
 	for i in range(len(data_MP)):
 		d1=abs(data_MP[i][0]-action[0])
@@ -124,12 +128,26 @@ def MetaPredictionMP(action):
 		dtot=d1+d2+d3
 		d.append([dtot,i])
 	d.sort()	#on trie dans l'ordre croissant des écarts
-	for i in range(K):
-		res += data_MP[i][3]
-	res = res / K
+	if K <= len(data_MP):
+		for i in range(K):
+			res += data_MP[i][3]
+		res = res / K
 	return res
 
 def PredictionP(action):
-	#TODO
-	return 0
+	d=[]	#on va ranger dans cette liste l'écart entre notre action et chaque exemple de la bdd
+	res=0	#valeur moyenne des K plus proches voisins, à retourner
+	for i in range(len(data_P)):
+		d1=abs(data_P[i][0]-action[0])
+		d2=abs(data_P[i][1]-action[1])
+		d3=abs(data_P[i][2]-action[2])
+		dtot=d1+d2+d3
+		d.append([dtot,i])
+	d.sort()	#on trie dans l'ordre croissant des écarts
+	if K <= len(data_P):
+		for i in range(K):
+			res += data_P[i][3]
+		res = res / K
+	
+	return res
     
