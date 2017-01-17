@@ -9,12 +9,18 @@ import sys
 import numpy as np
 import random
 
-# declaration des variables
+# declaration des constantes
 DELAY = 150
 NB_ITERATIONS = 1500
+NB_ACTIONS_ECHANTILLONAGE = 20
 NS = 250
+K = 5
+# declaration des variables
 LE = []	#liste erreur à chaque pas de temps
 LEm= [] #liste erreur moyenne à chaque pas de temps
+data_MP = []	#de la forme [param1,param2,param3,err]
+
+
 
 vrep.simxFinish(-1) # fermeture de toutes les connexions ouvertes
 clientID = vrep.simxStart('127.0.0.1',19999,True,True,5000,5) #etablissement de la connexion avec V-REP
@@ -52,16 +58,21 @@ def execute_action(cID, leftHandle, rightHandle, (speed_left,speed_right,frequen
 def bouclePrincipale():
 	t=0
 	possibleActions = []	#liste d'actions possibles à ce step
-    LPActions= []			#learning progress calculé pour chaque action
+	LPActions= []			#learning progress calculé pour chaque action
 
 	while t < NB_ITERATIONS:
 		'''
+			Génération liste d'actions possibles
+		'''
+		for i in range(NB_ACTIONS_ECHANTILLONAGE):
+			possibleActions.append( [random.uniform(-1,1) , random.uniform(-1,1) , random.uniform(0,1)] )
+		'''
 			Selection de l'action
 		'''
-		for i in range(len(LPActions)):
+		for i in range(len(possibleActions)):
 		
 			Ep = MetaPredictionMP(possibleActions[i]) #calcul de la prediction de l'erreur
-			tempLE = liste(LE) #on clone LE
+			tempLE = list(LE) #on clone LE
 			tempLE.append(Ep) #on rajoute à la liste clonée l'erreur prédite
 			Emp= np.mean(tempLE[-DELAY:])
 			LP= -(-Emp-LEm[t+1-DELAY])
@@ -76,31 +87,49 @@ def bouclePrincipale():
 		'''
 			Prediction de la machine P
 		'''
-			S = PredictionP(possibleActions[indiceActionChoisie])
+		S = PredictionP(possibleActions[indiceActionChoisie])
 		'''
 			Réalisation de l'action dans le simulateur
 		'''
 		#TODO
 
 		#On stoppe le robot
-		vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot)
-		vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot)
+		vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot_wait)
+		vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot_wait)
 		t += 1
 		'''
 			Vérification résultat action
 		'''
-		#TODO calcul de la distance, ce serait bien de faire avec senseurs, sinon directement avec les fonctions de VREPs
+		#TODO calcul de la distance, ce serait bien de faire avec senseurs, sinon directement avec les fonctions de VREP
 		Sa=0
 		#calcul de l'erreur
 		E= abs(S-Sa)
+		#sauvegarde dans data_MP
+		ajoutData=list(possibleActions[indiceActionChoisie])
+		ajoutData.append(E)
+		data_MP.append(ajoutData)
 		#maj listes
 		LE.append(E)
 		Em= np.mean(LE[-DELAY:])
 		LEm.append(Em)
-    
+	return 0
+
 def MetaPredictionMP(action):
-	#TODO
+	d=[]	#on va ranger dans cette liste l'écart entre notre action et chaque example de la bdd
+	res=0	#valeur moyenne des K plus proches voisins, à retourner
+	for i in range(len(data_MP)):
+		d1=abs(data_MP[i][0]-action[0])
+		d2=abs(data_MP[i][1]-action[1])
+		d3=abs(data_MP[i][2]-action[2])
+		dtot=d1+d2+d3
+		d.append([dtot,i])
+	d.sort()	#on trie dans l'ordre croissant des écarts
+	for i in range(K):
+		res += data_MP[i][3]
+	res = res / K
+	return res
 
 def PredictionP(action):
 	#TODO
+	return 0
     
