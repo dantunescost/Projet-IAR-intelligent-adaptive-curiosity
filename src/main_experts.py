@@ -130,10 +130,8 @@ def bouclePrincipale():
             Réalisation de l'action dans le simulateur
         '''
         execute_action(clientID,leftMotor,rightMotor,possibleActions[indiceActionChoisie],robotHandle,balle)
-        #time.sleep(1)
-        #On stoppe le robot
-#       vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot_wait)
-#       vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot_wait)
+        time.sleep(0.500)
+        
         '''
             Vérification résultat action
         '''
