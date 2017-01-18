@@ -8,15 +8,13 @@ import vrep
 import sys
 import numpy as np
 import random
-import time
-import matplotlib.pyplot as plt
 
 # declaration des constantes
 DELAY = 150
 NB_ITERATIONS = 1500
-NB_ACTIONS_ECHANTILLONAGE = 40
+NB_ACTIONS_ECHANTILLONAGE = 50
 NS = 250
-K = 10
+K = 5
 # declaration des variables
 LE = []         #liste erreur à chaque pas de temps
 LEm= []         #liste erreur moyenne à chaque pas de temps
@@ -81,34 +79,34 @@ def distance(cID):
 def bouclePrincipale():
     t=0
 
-    while t < NB_ITERATIONS:
+	while t < NB_ITERATIONS:
         possibleActions = []    #liste d'actions possibles à ce step
         LPActions= []           #learning progress calculé pour chaque action
         '''
             Génération liste d'actions possibles
         '''
-        for i in range(NB_ACTIONS_ECHANTILLONAGE):
+		for i in range(NB_ACTIONS_ECHANTILLONAGE):
             possibleActions.append( [random.uniform(-1,1) , random.uniform(-1,1) , random.uniform(0,1)] )
         '''
             Selection de l'action
         '''
-        for i in range(len(possibleActions)):
+		for i in range(len(possibleActions)):
         
             Ep = MetaPredictionMP(possibleActions[i]) #calcul de la prediction de l'erreur
             tempLE = list(LE) #on clone LE
             tempLE.append(Ep) #on rajoute à la liste clonée l'erreur prédite
             if t == 0:
                 LP = Ep
-            else:
-                if t < DELAY: 
-                    Emp = np.mean(tempLE)
-                    LP = -(Emp-LEm[0])
-                else:
-                    Emp= np.mean(tempLE[-DELAY:]) 
-                    LP = -(Emp-LEm[t-DELAY])
-            LPActions.append(LP)
-        #print "LP actions"
-        #print LPActions
+			else:
+				if t != 0 and t < DELAY: 
+					Emp = np.mean(tempLE)
+					LP = -(Emp-LEm[0])
+				else:
+				    Emp= np.mean(tempLE[-DELAY:]) 
+				    LP = -(Emp-LEm[t+1-DELAY])
+		   	LPActions.append(LP)
+
+        
         if(random.random() > 0.1):          #exploitation
             indiceActionChoisie = np.argmax(LPActions)
         else:                               #exploration
@@ -123,10 +121,11 @@ def bouclePrincipale():
             Réalisation de l'action dans le simulateur
         '''
         execute_action(clientID,leftMotor,rightMotor,possibleActions[indiceActionChoisie],robotHandle,balle)
-        #time.sleep(1)
+
         #On stoppe le robot
 #       vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot_wait)
 #       vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot_wait)
+        t += 1
         '''
             Vérification résultat action
         '''
@@ -145,18 +144,11 @@ def bouclePrincipale():
         #maj listes
         LE.append(E) 
         if len(LE) < DELAY:
-            #Em = np.mean(LE)
-            Em = 0
+            Em = np.mean(LE)
         else: 
             Em = np.mean(LE[-DELAY:]) 
         LEm.append(Em)
-        #print(Em)
-        print(t)
-        t += 1
-    
-    
-    plt.plot(LEm)
-    plt.show()
+        
     return 0
 
 def MetaPredictionMP(action):
@@ -177,10 +169,8 @@ def MetaPredictionMP(action):
             d.append([dtot,i])
         d.sort()    #on trie dans l'ordre croissant des écarts
         for i in range(K):
-            res += data_MP[d[i][1]][3]
+            res += data_MP[i][3]
         res = res / K
-    #print "PREDICTION MP"
-    #print res
     return res
 
 def PredictionP(action):
@@ -191,7 +181,6 @@ def PredictionP(action):
     if len(data_P) < K:
         for i in range(len(data_P)):
             res += data_P[i][3]
-            #print "data_P[i][3]"+str(data_P[i][3])
         res = res / len(data_P)
     else:
         for i in range(len(data_P)):
@@ -203,14 +192,13 @@ def PredictionP(action):
         d.sort()    #on trie dans l'ordre croissant des écarts
         if K <= len(data_P):
             for i in range(K):
-                res += data_P[d[i][1]][3]
-                #print "data_P[i][3]"+str(data_P[d[i][1]][3])
+                res += data_P[i][3]
             res = res / K
-    #print "PREDICTION P"
-    #print res
+    
     return res
     
 bouclePrincipale()
     
 
             
+			
