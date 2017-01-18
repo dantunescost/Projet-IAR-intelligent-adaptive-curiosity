@@ -38,19 +38,41 @@ returnCode, leftMotor = vrep.simxGetObjectHandle(clientID,"leftMotor", vrep.simx
 returnCode, rightMotor = vrep.simxGetObjectHandle(clientID,"rightMotor", vrep.simx_opmode_oneshot_wait)
 returnCode, balle = vrep.simxGetObjectHandle(clientID,"balle", vrep.simx_opmode_oneshot_wait)
 
-print("echec? : " + str(returnCode) + ", robotHandle : " + str(robotHandle))
-
-returnCode, positionRobot = vrep.simxGetObjectPosition(clientID,robotHandle,-1,vrep.simx_opmode_oneshot_wait)
-
-print("echec? : " + str(returnCode) + ", position du Robot : " + str(positionRobot))
-
-#vrep.simxSet(clientID,robotHandle,-1,[-0.38424891233444214, -0.7967437505722046, 0.1386629045009613],vrep.simx_opmode_oneshot_wait)
-
 returnVal = vrep.simxCallScriptFunction(clientID,"",)
 
-def execute_action(cID, leftHandle, rightHandle, (speed_left,speed_right,frequency)):
-    vrep.simxSetJointTargetVelocity(cID,leftHandle,-1,vrep.simx_opmode_oneshot)
-    vrep.simxSetJointTargetVelocity(cID,rightHandle,-1,vrep.simx_opmode_oneshot)
+def execute_action(cID, leftHandle, rightHandle, (speed_left,speed_right,frequency), botHandle, ballHandle):
+    vrep.simxSetJointTargetVelocity(cID,leftHandle,speed_left,vrep.simx_opmode_oneshot)
+    vrep.simxSetJointTargetVelocity(cID,rightHandle,speed_right,vrep.simx_opmode_oneshot)
+    if frequency > 0.66 and frequency <= 1:
+        # ball jumps to robot
+        returnCode1, pos1 = vrep.simxGetObjectPosition(cID,botHandle,-1,vrep.simx_opmode_oneshot_wait)
+        returnCode2, pos2 = vrep.simxGetObjectPosition(cID,ballHandle,-1,vrep.simx_opmode_oneshot_wait)
+        vrep.simxSetObjectPosition(cID,ballHandle,-1,[pos1[0],pos1[1],pos2[2]],vrep.simx_opmode_oneshot)
+#        signeX = -1 if (pos2[0]-pos1[0] < 0) else 1
+#        signeY = -1 if (pos2[1]-pos1[1] < 0) else 1
+#        if np.abs(pos1[0]-pos2[0]) < np.abs(pos1[1]-pos2[1]): # balle plus loin dans l'axe y
+#            ratio = np.abs(pos1[0]-pos2[0])/np.abs(pos1[1]-pos2[1])
+#            vrep.simxSetObjectPosition(cID,ballHandle,botHandle,[largeurRobot*signeX*ratio,largeurRobot*signeY,0],vrep.simx_opmode_oneshot)
+#        else: # balle plus loin sur l'axe x
+#            ratio = np.abs(pos1[1]-pos2[1])/np.abs(pos1[0]-pos2[0]) if np.abs(pos1[0]-pos2[0]) != 0 else 1
+#            vrep.simxSetObjectPosition(cID,ballHandle,botHandle,[largeurRobot*signeX,largeurRobot*signeY*ratio,0],vrep.simx_opmode_oneshot)
+    if frequency >= 0 and frequency <= 0.33:
+        # ball goes to random position
+        returnCode1, pos1 = vrep.simxGetObjectPosition(cID,botHandle,-1,vrep.simx_opmode_oneshot_wait)
+        returnCode2, pos2 = vrep.simxGetObjectPosition(cID,ballHandle,-1,vrep.simx_opmode_oneshot_wait)
+        vrep.simxSetObjectPosition(cID,ballHandle,-1,[random.uniform(-2.3,2.3),random.uniform(-2.3,2.3),pos2[2]],vrep.simx_opmode_oneshot)
+       
+def distance(cID):
+#    returnCode1, position1 = vrep.simxGetObjectPosition(cID,handle1,-1,vrep.simx_opmode_oneshot_wait)
+#    returnCode2, position2 = vrep.simxGetObjectPosition(cID,handle2,-1,vrep.simx_opmode_oneshot_wait)
+#    if(returnCode1 or returnCode2):
+#        print("Erreur dans requête de position")
+#        sys.exit("simxGetObjectionPosition error")
+#    else:
+#        return np.sqrt((position1[0]-position2[0])**2+(position1[1]-position2[1])**2)
+    retCode, dist = vrep.simxGetDistanceHandle(cID,"distance",vrep.simx_opmode_oneshot)
+    retCode, distance = vrep.simxReadDistance(cID,dist,vrep.simx_opmode_oneshot)
+    return distance
     
     
     
@@ -80,7 +102,7 @@ def bouclePrincipale():
 		
 		indiceActionChoisie = 0
 		if(random.random() > 0.1):			#exploitation
-			indiceActionChoisie = np.argmax(LPactions)
+			indiceActionChoisie = np.argmax(LPActions)
 		else:								#exploration
 			indiceActionChoisie = 0
 
@@ -100,21 +122,21 @@ def bouclePrincipale():
 		'''
 			Vérification résultat action
 		'''
-		#TODO calcul de la distance, ce serait bien de faire avec senseurs, sinon directement avec les fonctions de VREP
-		Sa=0
+		# calcul de la distance, ce serait bien de faire avec senseurs, sinon directement avec les fonctions de VREP
+		Sa = distance(clientID)
 		#sauvegarde dans data_P
 		ajoutData=list(possibleActions[indiceActionChoisie])
 		ajoutData.append(Sa)
 		data_P.append(ajoutData)
 		#calcul de l'erreur
-		E= abs(S-Sa)
+		E = abs(S-Sa)
 		#sauvegarde dans data_MP
 		ajoutData=list(possibleActions[indiceActionChoisie])
 		ajoutData.append(E)
 		data_MP.append(ajoutData)
 		#maj listes
 		LE.append(E)
-		Em= np.mean(LE[-DELAY:])
+		Em = np.mean(LE[-DELAY:])
 		LEm.append(Em)
 	return 0
 
