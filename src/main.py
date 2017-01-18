@@ -12,14 +12,14 @@ import random
 # declaration des constantes
 DELAY = 150
 NB_ITERATIONS = 1500
-NB_ACTIONS_ECHANTILLONAGE = 20
+NB_ACTIONS_ECHANTILLONAGE = 50
 NS = 250
 K = 5
 # declaration des variables
-LE = []	#liste erreur à chaque pas de temps
-LEm= [] #liste erreur moyenne à chaque pas de temps
+LE = []         #liste erreur à chaque pas de temps
+LEm= []         #liste erreur moyenne à chaque pas de temps
 data_MP = []	#de la forme [param1,param2,param3,ecart]
-data_P = []		#de la forme [param1,param2,param3,distance]
+data_P = []	#de la forme [param1,param2,param3,distance]
 
 
 vrep.simxFinish(-1) # fermeture de toutes les connexions ouvertes
@@ -80,7 +80,7 @@ def distance(cID):
 def bouclePrincipale():
 	t=0
 	possibleActions = []	#liste d'actions possibles à ce step
-	LPActions= []			#learning progress calculé pour chaque action
+	LPActions= []		#learning progress calculé pour chaque action
 
 	while t < NB_ITERATIONS:
 		'''
@@ -96,11 +96,10 @@ def bouclePrincipale():
 			Ep = MetaPredictionMP(possibleActions[i]) #calcul de la prediction de l'erreur
 			tempLE = list(LE) #on clone LE
 			tempLE.append(Ep) #on rajoute à la liste clonée l'erreur prédite
-			Emp= np.mean(tempLE[-DELAY:])
+			Emp= np.mean(tempLE[-DELAY:]) #TODO calculer la moyenne des exemples existants s'il n'y en a pas encore DELAY
 			LP= -(-Emp-LEm[t+1-DELAY])
 			LPActions.append(LP)
 		
-		indiceActionChoisie = 0
 		if(random.random() > 0.1):			#exploitation
 			indiceActionChoisie = np.argmax(LPActions)
 		else:								#exploration
@@ -113,11 +112,11 @@ def bouclePrincipale():
 		'''
 			Réalisation de l'action dans le simulateur
 		'''
-		#TODO
+		#TODO executer l'action dans le simulateur
 
 		#On stoppe le robot
-		vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot_wait)
-		vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot_wait)
+#		vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot_wait)
+#		vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot_wait)
 		t += 1
 		'''
 			Vérification résultat action
@@ -132,14 +131,15 @@ def bouclePrincipale():
 		E = abs(S-Sa)
 		#sauvegarde dans data_MP
 		ajoutData=list(possibleActions[indiceActionChoisie])
-		ajoutData.append(E)
+		ajoutData.append(E) #a verfifier
 		data_MP.append(ajoutData)
 		#maj listes
-		LE.append(E)
-		Em = np.mean(LE[-DELAY:])
+		LE.append(E) 
+		Em = np.mean(LE[-DELAY:]) #TODO que si t > DELAY
 		LEm.append(Em)
 	return 0
 
+#TODO pour les deux algos k-moyenne, renvoyer la moyenne des existants au lieu de 0 dans le cas ou len(data) < K ???
 def MetaPredictionMP(action):
 	d=[]	#on va ranger dans cette liste l'écart entre notre action et chaque exemple de la bdd
 	res=0	#valeur moyenne des K plus proches voisins, à retourner
