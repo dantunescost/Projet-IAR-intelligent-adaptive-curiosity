@@ -38,7 +38,6 @@ returnCode, leftMotor = vrep.simxGetObjectHandle(clientID,"leftMotor", vrep.simx
 returnCode, rightMotor = vrep.simxGetObjectHandle(clientID,"rightMotor", vrep.simx_opmode_oneshot_wait)
 returnCode, balle = vrep.simxGetObjectHandle(clientID,"balle", vrep.simx_opmode_oneshot_wait)
 
-returnVal = vrep.simxCallScriptFunction(clientID,"",)
 
 def execute_action(cID, leftHandle, rightHandle, action, botHandle, ballHandle):
     vrep.simxSetJointTargetVelocity(cID,leftHandle,action[0],vrep.simx_opmode_oneshot)
@@ -98,12 +97,13 @@ def bouclePrincipale():
             tempLE.append(Ep) #on rajoute à la liste clonée l'erreur prédite
             if t == 0:
                 LP = Ep
-            if t != 0 and t < DELAY: 
-                Emp = np.mean(tempLE)
-                LP = -(Emp-LEm[0])
             else:
-                Emp= np.mean(tempLE[-DELAY:]) 
-                LP = -(Emp-LEm[t+1-DELAY])
+                if t < DELAY: 
+                    Emp = np.mean(tempLE)
+                    LP = -(Emp-LEm[0])
+                else:
+                    Emp= np.mean(tempLE[-DELAY:]) 
+                    LP = -(Emp-LEm[t+1-DELAY])
             LPActions.append(LP)
         
         if(random.random() > 0.1):          #exploitation
@@ -124,7 +124,6 @@ def bouclePrincipale():
         #On stoppe le robot
 #       vrep.simxSetJointTargetVelocity(clientID,leftMotor,0,vrep.simx_opmode_oneshot_wait)
 #       vrep.simxSetJointTargetVelocity(clientID,rightMotor,0,vrep.simx_opmode_oneshot_wait)
-        t += 1
         '''
             Vérification résultat action
         '''
@@ -147,6 +146,9 @@ def bouclePrincipale():
         else: 
             Em = np.mean(LE[-DELAY:]) 
         LEm.append(Em)
+        print(Em)
+        print(t)
+        t += 1
         
     return 0
 
