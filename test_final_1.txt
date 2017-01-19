@@ -1,0 +1,8 @@
+on coupe a la dimension 2, a la valeur 0.76501633653, à l'index 134.
+on coupe a la dimension 2, a la valeur 0.913125937433, à l'index 132.
+on coupe a la dimension 2, a la valeur 0.852874140886, à l'index 136.
+on coupe a la dimension 2, a la valeur 0.80942610774, à l'index 135.
+on coupe a la dimension 2, a la valeur 0.882633644853, à l'index 120.
+on coupe a la dimension 3, a la valeur 0.0, à l'index 133.
+on coupe a la dimension 2, a la valeur 0.542870682099, à l'index 121.
+on coupe a la dimension 2, a la valeur 0.946257255575, à l'index 135.

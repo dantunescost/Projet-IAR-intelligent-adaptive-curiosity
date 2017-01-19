@@ -215,7 +215,7 @@ def cutExpert(expert,taille):       #Fonction qui permet de générer 2 experts 
     for i in range(len(expert['data_P'][0])-1):     #on parcoure les dimensions speedLeft, speedRight, Frequence
         dataCopy.sort(key=operator.itemgetter(i))
         for j in range((len(dataCopy)//2)-(len(dataCopy)//20),(len(dataCopy)//2)+(len(dataCopy)//20)):  #on cherche à minimiser la somme des variances de chaque sous-liste
-            var = np.std(dataCopy[:j][i]) + np.std(dataCopy[j:][i])
+            var = np.std(dataCopy[:j][4]) + np.std(dataCopy[j:][4])
             if var < stdMin:
                 stdMin = var
                 dim = i
