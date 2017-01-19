@@ -4,11 +4,8 @@
 
 """
 
-import vrep
-import sys
+import vrep, copy, sys, random, operator#,time
 import numpy as np
-import random
-#import time
 import matplotlib.pyplot as plt
 
 # declaration des constantes
@@ -18,10 +15,17 @@ NB_ACTIONS_ECHANTILLONAGE = 40
 NS = 250
 K = 10
 # declaration des variables
+DATA = []       #base contenant les experts
 LE = []         #liste erreur à chaque pas de temps
 LEm= []         #liste erreur moyenne à chaque pas de temps
 data_MP = []    #de la forme [speedLeft,speedRight,frequence,erreur de prediction]
-data_P = [] #de la forme [speedLeft,speedRight,frequence, distance de la balle]
+data_P = []     #de la forme [speedLeft,speedRight,frequence,distance avant action ,distance après action de la balle]
+Cut = []
+Cut.append("")
+
+dict = {'Name': 'Zara', 'Age': 7, 'Class': 'First'}
+# Creation du premier expert (unique), child1 contient les valeurs en-dessous de cutVal
+DATA.append({"LE" : LE, "LEm" : LEm, "data_P" : data_P, "indexDim" : -1, "cutVal" : -99, "child1" : -1, "child2" : -1})
 
 
 vrep.simxFinish(-1) # fermeture de toutes les connexions ouvertes
@@ -42,8 +46,8 @@ returnCode, balle = vrep.simxGetObjectHandle(clientID,"balle", vrep.simx_opmode_
 
 
 def execute_action(cID, leftHandle, rightHandle, action, botHandle, ballHandle):
-    vrep.simxSetJointTargetVelocity(cID,leftHandle,action[0],vrep.simx_opmode_oneshot)
-    vrep.simxSetJointTargetVelocity(cID,rightHandle,action[1],vrep.simx_opmode_oneshot)
+    vrep.simxSetJointTargetVelocity(cID,leftHandle,action[0]*5,vrep.simx_opmode_oneshot)
+    vrep.simxSetJointTargetVelocity(cID,rightHandle,action[1]*5,vrep.simx_opmode_oneshot)
     if action[2] > 0.66 and action[2] <= 1:
         # ball jumps to robot
         returnCode1, pos1 = vrep.simxGetObjectPosition(cID,botHandle,-1,vrep.simx_opmode_oneshot_wait)
@@ -67,8 +71,8 @@ def bouclePrincipale():
     t=0
 
     while t < NB_ITERATIONS:
-        possibleActions = []    #liste d'actions possibles à ce step, tirées aléatoirement
-        LPActions= []           #liste des learning progress calculés pour chaque action
+        possibleActions = []    #liste d'actions possibles à ce step
+        LPActions= []           #learning progress calculé pour chaque action
         '''
             Génération liste d'actions possibles
         '''
@@ -77,65 +81,78 @@ def bouclePrincipale():
         '''
             Selection de l'action
         '''
+        distanceInitiale=distance(clientID)
+
         for i in range(len(possibleActions)):
         
             Ep = MetaPredictionMP(possibleActions[i]) #calcul de la prediction de l'erreur
-            tempLE = list(LE) #on clone LE
+            expert = expertAUtiliser(possibleActions[i],distanceInitiale)
+            tempLE = list(expert['LE']) #on clone LE
             tempLE.append(Ep) #on rajoute à la liste clonée l'erreur prédite
             if t == 0:
                 LP = Ep
             else:
                 if t < DELAY: 
                     Emp = np.mean(tempLE)
-                    LP = -(Emp-LEm[0])
+                    LP = -(Emp-expert['LEm'][0])
                 else:
                     Emp= np.mean(tempLE[-DELAY:]) 
-                    LP = -(Emp-LEm[t-DELAY])
+                    LP = -(Emp-expert['LEm'][len(expert['LE'])-DELAY]) #len(expert['LE]) contient le nombre de fois que cet expert a ete utilise
             LPActions.append(LP)
+
         if(random.random() > 0.1):          #exploitation
             indiceActionChoisie = np.argmax(LPActions)
         else:                               #exploration
             indiceActionChoisie = 0
 
+        # on calcule l'expert a utiliser pour cette action
+        expert = expertAUtiliser(possibleActions[indiceActionChoisie],distanceInitiale)
         '''
             Prediction de la machine P
         '''
-        S = PredictionP(possibleActions[indiceActionChoisie])
+        S = PredictionP(possibleActions[indiceActionChoisie],expert,distanceInitiale)
+        
         
         '''
             Réalisation de l'action dans le simulateur
         '''
         execute_action(clientID,leftMotor,rightMotor,possibleActions[indiceActionChoisie],robotHandle,balle)
-        #time.sleep(1)      #si on veut que le robot effectue des déplacements plus importants
+        #time.sleep(0.500)
+        
         '''
             Vérification résultat action
         '''
-        # calcul de la distance, capteur "parfait"
+        # calcul de la distance, ce serait bien de faire avec senseurs, sinon directement avec les fonctions de VREP
         Sa = distance(clientID)
         #sauvegarde dans data_P
         ajoutData=list(possibleActions[indiceActionChoisie])
+        ajoutData.append(distanceInitiale)
         ajoutData.append(Sa)
-        data_P.append(ajoutData)
+        expert['data_P'].append(ajoutData)
         #calcul de l'erreur
         E = abs(S-Sa)
         #sauvegarde dans data_MP
         ajoutData=list(possibleActions[indiceActionChoisie])
-        ajoutData.append(E)
+        ajoutData.append(E) 
         data_MP.append(ajoutData)
         #maj listes
-        LE.append(E) 
+        expert['LE'].append(E) 
         if len(LE) < DELAY:
             Em = 0
         else: 
-            Em = np.mean(LE[-DELAY:]) 
-        LEm.append(Em)
+            Em = np.mean(expert['LE'][-DELAY:]) 
+        expert['LEm'].append(Em)
+        
+        #on verifie si on doit ajouter un expert
+        if len(expert['data_P']) == NS:
+            Cut[0] += cutExpert(expert,len(DATA))
         print(t)
         t += 1
     
-    
-    #Tracage de la courbe d'erreur moyenne
-    plt.plot(LEm)
+    for i in range(len(DATA)):
+        plt.plot(DATA[i]['LEm'])
     plt.show()
+    print Cut[0]
     return 0
 
 def MetaPredictionMP(action):
@@ -160,28 +177,71 @@ def MetaPredictionMP(action):
         res = res / K
     return res
 
-def PredictionP(action):
+def PredictionP(action,expert,distanceInitiale):
     d=[]    #on va ranger dans cette liste l'écart entre notre action et chaque exemple de la bdd
     res=0   #valeur moyenne des K plus proches voisins, à retourner
+    data_P = expert['data_P']
     if len(data_P) == 0:
         return res
     if len(data_P) < K:
         for i in range(len(data_P)):
-            res += data_P[i][3]
+            res += data_P[i][4]
         res = res / len(data_P)
     else:
+        dtot=0
         for i in range(len(data_P)):
             d1=abs(data_P[i][0]-action[0])
             d2=abs(data_P[i][1]-action[1])
             d3=abs(data_P[i][2]-action[2])
-            dtot=d1+d2+d3
+            d4=abs(data_P[i][3]-distanceInitiale)   #On ajoute la distance initiale parmis les parametres sensori-moteurs
+            dtot=d1+d2+d3+d4*(1/2)  #somme pondérée
+            
             d.append([dtot,i])
         d.sort()    #on trie dans l'ordre croissant des écarts
         if K <= len(data_P):
             for i in range(K):
-                res += data_P[d[i][1]][3]
+                res += data_P[d[i][1]][4]
             res = res / K
     return res
+    
+    
+def cutExpert(expert,taille):       #Fonction qui permet de générer 2 experts à partir d'un expert parent
+    #print("CUUUUUUUUUUUUUUUUUUUUUUUT")
+    dataCopy = copy.copy(expert['data_P'])  #On copie la base de donnée de l'expert original
+    stdMin = 1000
+    dim = -1
+    indexCutVal = -1
+    cutVal = -99
+    for i in range(len(expert['data_P'][0])-1):     #on parcoure les dimensions speedLeft, speedRight, Frequence
+        dataCopy.sort(key=operator.itemgetter(i))
+        for j in range((len(dataCopy)//2)-(len(dataCopy)//20),(len(dataCopy)//2)+(len(dataCopy)//20)):  #on cherche à minimiser la somme des variances de chaque sous-liste
+            var = np.std(dataCopy[:j][i]) + np.std(dataCopy[j:][i])
+            if var < stdMin:
+                stdMin = var
+                dim = i
+                indexCutVal = j
+                cutVal = dataCopy[j][i]
+    expert['child1'] = taille
+    expert['child2'] = taille + 1
+    expert['indexDim'] = dim
+    expert['cutVal'] = cutVal
+    dataCopy.sort(key=operator.itemgetter(dim))
+    DATA.append({"LE" : list(expert['LE']), "LEm" : list(expert['LEm']), "data_P" : list(dataCopy[:indexCutVal]), "indexDim" : -1, "cutVal" : -99, "child1" : -1, "child2" : -1})
+    DATA.append({"LE" : list(expert['LE']), "LEm" : list(expert['LEm']), "data_P" : list(dataCopy[indexCutVal:]), "indexDim" : -1, "cutVal" : -99, "child1" : -1, "child2" : -1})
+    return ("on coupe a la dimension "+ str(dim) + ", a la valeur " + str(cutVal) + ", à l'index "+str(indexCutVal) + ".\n")    
+    
+    
+def expertAUtiliser(action,distanceInitiale):       #Cette fonction permet de trouver le meilleur expert pour l'action en parcourant le pseudo-arbre
+    expert = DATA[0]
+    tempAction=list(action)
+    tempAction.append(distanceInitiale) 
+    
+    while expert['child1'] != -1:
+        if tempAction[expert['indexDim']] <= expert['cutVal']:
+            expert = DATA[expert['child1']]
+        else:
+            expert = DATA[expert['child2']]
+    return expert
     
 bouclePrincipale()
     
